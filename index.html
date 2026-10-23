@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pi-container</title>
+<style>
+:root {
+  /* light (default): projector-friendly */
+  --bg: #f7f5f0;
+  --panel: #ffffff;
+  --panel-2: #f1eee8;
+  --line: #e2ddd3;
+  --text: #17191f;
+  --dim: #4f5663;
+  --faint: #7d838f;
+  --accent: #d9480f;
+  --accent-soft: rgba(217, 72, 15, .08);
+  --teal: #0b7d72;
+  --teal-soft: rgba(11, 125, 114, .08);
+  --bad: #d6293e;
+  --glow: rgba(217, 72, 15, .28);
+  --shadow: 0 2px 14px rgba(23, 25, 31, .06);
+  --badge-bg: rgba(255, 255, 255, .9);
+  --wash-1: rgba(217, 72, 15, .06);
+  --wash-2: rgba(11, 125, 114, .05);
+  --font: "PingFang SC", "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", "Hiragino Sans GB", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+}
+:root[data-theme="dark"] {
+  --bg: #0c0e13;
+  --panel: #151922;
+  --panel-2: #1b202b;
+  --line: #2a3140;
+  --text: #f1f2f5;
+  --dim: #a3abb9;
+  --faint: #6b7385;
+  --accent: #ff7a45;
+  --accent-soft: rgba(255, 122, 69, .14);
+  --teal: #4fd1c5;
+  --teal-soft: rgba(79, 209, 197, .13);
+  --bad: #ff6170;
+  --glow: rgba(255, 122, 69, .35);
+  --shadow: none;
+  --badge-bg: rgba(12, 14, 19, .82);
+  --wash-1: rgba(255, 122, 69, .07);
+  --wash-2: rgba(79, 209, 197, .06);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden; }
+body { display: grid; place-items: center; }
+
+/* 1920×1080 stage, scaled to fit whatever pane it is shown in */
+#stage { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 0 0; }
+.slide {
+  position: absolute; inset: 0; padding: 110px 140px 120px;
+  display: flex; flex-direction: column;
+  opacity: 0; visibility: hidden; transition: opacity .5s ease, visibility .5s;
+  background:
+    radial-gradient(1200px 700px at 100% 0%, var(--wash-1), transparent 60%),
+    radial-gradient(900px 600px at 0% 100%, var(--wash-2), transparent 60%),
+    var(--bg);
+}
+.slide.active { opacity: 1; visibility: visible; }
+
+/* staggered entrance */
+.r { opacity: 0; transform: translateY(28px); }
+.slide.active .r { animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; animation-delay: calc(var(--i, 0) * 120ms + 150ms); }
+@keyframes rise { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .slide.active .r { animation: none; opacity: 1; transform: none; } }
+
+.kicker { font-size: 30px; letter-spacing: .18em; color: var(--accent); font-weight: 600; margin-bottom: 26px; }
+h1 { font-size: 150px; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+h2 { font-size: 72px; font-weight: 750; line-height: 1.2; letter-spacing: -.01em; }
+h2 em, h1 em, .em { font-style: normal; color: var(--accent); }
+.lead { font-size: 40px; color: var(--dim); line-height: 1.5; }
+.small { font-size: 30px; color: var(--faint); line-height: 1.5; }
+.grow { flex: 1; }
+.row { display: flex; gap: 40px; }
+.col { display: flex; flex-direction: column; gap: 28px; }
+.center { align-items: center; justify-content: center; text-align: center; }
+.mt { margin-top: 64px; }
+
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 28px; padding: 48px 52px; box-shadow: var(--shadow);
+}
+.card h3 { font-size: 46px; font-weight: 700; margin-bottom: 22px; }
+.card p { font-size: 34px; color: var(--dim); line-height: 1.55; }
+.num { font-family: var(--mono); font-size: 30px; color: var(--accent); font-weight: 700; margin-bottom: 18px; display: block; }
+
+.foot { font-size: 30px; color: var(--faint); border-top: 1px solid var(--line); padding-top: 30px; margin-top: auto; }
+.foot b { color: var(--dim); font-weight: 600; }
+.tag { display: inline-block; font-size: 26px; padding: 8px 20px; border-radius: 999px; border: 1px solid var(--line); color: var(--dim); background: var(--panel); }
+
+/* --- cover --- */
+.cover { justify-content: center; }
+.cover .sub { font-size: 64px; font-weight: 700; margin-top: 44px; }
+.cover .desc { font-size: 36px; color: var(--dim); margin-top: 26px; }
+.cover .meta { margin-top: 90px; display: flex; gap: 60px; font-size: 32px; color: var(--faint); }
+.cover .meta b { color: var(--text); font-weight: 600; margin-left: 14px; }
+.fleet { position: absolute; right: 150px; top: 330px; display: grid; grid-template-columns: repeat(4, 96px); gap: 26px; }
+.fleet i { width: 96px; height: 72px; border-radius: 14px; border: 2px solid var(--line); background: var(--panel); position: relative; }
+.fleet i::after { content: ""; position: absolute; left: 30px; right: 30px; bottom: -14px; height: 6px; border-radius: 3px; background: var(--line); }
+.fleet i.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 40px var(--glow); }
+.slide.active .fleet i.on { animation: pulse 2.4s ease-in-out infinite; }
+.fleet i.on:nth-child(6) { animation-delay: .8s; } .fleet i.on:nth-child(11) { animation-delay: 1.6s; }
+@keyframes pulse { 50% { box-shadow: 0 0 6px transparent; } }
+
+/* --- pain --- */
+.pain .card { flex: 1; }
+.pain .card h3 { font-size: 54px; }
+.pain .card h3 span { color: var(--accent); }
+
+/* --- say vs do --- */
+.vs { display: grid; grid-template-columns: 1fr 120px 1fr; align-items: stretch; }
+.vs .arrow { display: grid; place-items: center; color: var(--faint); font-size: 64px; }
+.vs .card.hot { border-color: var(--accent); background: linear-gradient(180deg, var(--accent-soft), var(--panel) 70%); }
+.chips { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 30px; }
+.chips span { font-size: 30px; padding: 10px 24px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); }
+.where { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 40px; }
+.where div { border-radius: 22px; padding: 30px 36px; font-size: 34px; border: 1px solid var(--line); background: var(--panel); }
+.where small { display: block; font-size: 28px; color: var(--dim); margin-top: 10px; }
+.where .x b { color: var(--bad); } .where .ok { border-color: var(--teal); background: var(--teal-soft); } .where .ok b { color: var(--teal); }
+
+/* --- architecture --- */
+.arch { display: grid; grid-template-columns: 300px 90px 1fr; align-items: center; margin-top: 56px; }
+.node { border: 1px solid var(--line); background: var(--panel); border-radius: 24px; padding: 30px; text-align: center; }
+.node b { display: block; font-size: 38px; }
+.node small { display: block; font-size: 26px; color: var(--dim); margin-top: 10px; line-height: 1.5; }
+.flow { color: var(--faint); font-size: 52px; text-align: center; }
+.platform { border: 2px solid var(--accent); border-radius: 30px; padding: 30px 36px 36px; background: linear-gradient(180deg, var(--accent-soft), transparent 40%); }
+.platform > .hd { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 26px; }
+.platform > .hd b { font-size: 40px; color: var(--accent); }
+.platform > .hd span { font-size: 28px; color: var(--dim); }
+.hosts { display: grid; grid-template-columns: 1fr 1fr 330px; gap: 26px; }
+.host { border: 1px dashed var(--line); border-radius: 22px; padding: 22px; }
+.host > small { font-size: 24px; color: var(--faint); display: block; margin-bottom: 14px; }
+.pc { border: 1px solid var(--teal); background: var(--teal-soft); border-radius: 16px; padding: 16px 20px; margin-top: 12px; }
+.pc b { display: block; color: var(--teal); font-size: 30px; } .pc span { display: block; color: var(--dim); font-size: 24px; margin-top: 4px; }
+.gw { border: 1px solid var(--line); border-radius: 22px; padding: 24px; display: flex; flex-direction: column; justify-content: center; gap: 14px; text-align: center; }
+.gw b { font-size: 32px; } .gw small { font-size: 24px; color: var(--dim); line-height: 1.5; }
+.gw .model { margin-top: 8px; border-radius: 14px; background: var(--panel-2); padding: 14px; font-size: 26px; }
+
+/* --- loop --- */
+.method { display: grid; grid-template-columns: 720px 1fr; gap: 70px; align-items: center; margin-top: 40px; }
+.loop { position: relative; width: 640px; height: 640px; }
+.loop svg { position: absolute; inset: 0; }
+.loop .st { position: absolute; width: 250px; text-align: center; transform: translate(-50%, -50%); background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 18px 10px; }
+.loop .st b { display: block; font-size: 46px; }
+.loop .st small { display: block; font-size: 26px; color: var(--dim); margin-top: 6px; line-height: 1.4; }
+.loop .core { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 28px; color: var(--dim); line-height: 1.5; }
+.loop .core b { display: block; color: var(--text); font-size: 34px; }
+.slide.active .loop .spin { animation: spin 14s linear infinite; transform-origin: 320px 320px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* --- look left --- */
+.look { justify-content: center; }
+.look .big { font-size: 170px; font-weight: 800; display: flex; align-items: center; gap: 40px; }
+.look .big svg { flex: none; }
+.slide.active .look-arrow { animation: nudge 1.4s ease-in-out infinite; }
+@keyframes nudge { 50% { transform: translateX(-24px); } }
+.steps { display: flex; align-items: center; gap: 18px; margin-top: 70px; flex-wrap: wrap; }
+.steps span { font-size: 34px; padding: 18px 30px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+.steps i { font-style: normal; color: var(--faint); font-size: 34px; }
+.slide.active .steps span { animation: lit 10s linear infinite; }
+.steps span:nth-of-type(2) { animation-delay: 2s !important; } .steps span:nth-of-type(3) { animation-delay: 4s !important; }
+.steps span:nth-of-type(4) { animation-delay: 6s !important; } .steps span:nth-of-type(5) { animation-delay: 8s !important; }
+@keyframes lit { 0%, 20% { border-color: var(--accent); background: var(--accent-soft); } 21%, 100% { border-color: var(--line); background: var(--panel); } }
+
+/* --- toolbox --- */
+.tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 44px; }
+.tool { background: var(--panel); border: 1px solid var(--line); border-radius: 26px; padding: 32px 40px; box-shadow: var(--shadow); }
+.tool .ico { width: 64px; height: 64px; border-radius: 16px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; margin-bottom: 18px; }
+.tool b { font-size: 42px; display: block; }
+.tool p { font-size: 30px; color: var(--dim); margin-top: 12px; line-height: 1.5; }
+
+/* --- screenshots --- */
+.shot { border-radius: 22px; overflow: hidden; border: 1px solid var(--line); background: var(--panel); position: relative; }
+.shot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+.shot .ph { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--faint); font-size: 30px; border: 3px dashed var(--line); border-radius: 22px; }
+.shot .badge { position: absolute; right: 12px; top: 10px; font-size: 15px; padding: 3px 12px; z-index: 2; border-radius: 999px; background: var(--badge-bg); color: var(--dim); border: 1px solid var(--line); }
+.bench { display: grid; grid-template-columns: 1fr 640px; gap: 56px; margin-top: 50px; flex: 1; min-height: 0; }
+.feat { display: flex; flex-direction: column; gap: 22px; justify-content: center; }
+.feat div { font-size: 34px; padding-left: 34px; position: relative; line-height: 1.4; }
+.feat div::before { content: ""; position: absolute; left: 0; top: 18px; width: 14px; height: 14px; border-radius: 4px; background: var(--accent); }
+.feat div small { display: block; font-size: 27px; color: var(--dim); }
+
+/* --- UI mockups: fixed light colors, like the real light-theme apps --- */
+.mk { position: absolute; inset: 0; background: #fff; color: #1f2328; font-family: var(--font); font-size: 18px; line-height: 1.4; overflow: hidden; text-align: left; }
+.mk code { font-family: var(--mono); font-size: .86em; }
+.mk .hl { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.pw-call, .pt-call { position: absolute; font-size: 22px; font-weight: 700; color: #fff; background: var(--accent); padding: 6px 16px; border-radius: 999px; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.15); }
+
+.pw { display: grid; grid-template-columns: 250px 1fr; }
+.pw aside { background: #f7f7f8; border-right: 1px solid #e5e7eb; padding: 18px 14px; display: flex; flex-direction: column; gap: 10px; }
+.pw-brand { display: flex; justify-content: space-between; align-items: center; }
+.pw-brand b { font-family: var(--mono); font-size: 19px; } .pw-brand span { font-size: 15px; border: 1px solid #d9dce1; border-radius: 8px; padding: 2px 10px; background: #fff; }
+.pw-cwd { font-family: var(--mono); font-size: 15px; background: #eceef1; border-radius: 8px; padding: 6px 10px; }
+.pw-sess { padding: 8px 10px; border-radius: 8px; } .pw-sess b { display: block; font-weight: 500; font-size: 16px; } .pw-sess small { color: #8a8f98; font-size: 13px; }
+.pw-sess.on { background: #e8eaee; }
+.pw-exp { margin-top: 10px; font-size: 13px; letter-spacing: .1em; color: #6b7280; font-weight: 600; }
+.pw-tree div { font-size: 15px; padding: 3px 4px; } .pw-tree .i { padding-left: 22px; }
+.pw-tree .hl { font-weight: 700; color: var(--accent); }
+.pw-foot { margin-top: auto; display: flex; justify-content: space-between; font-size: 14px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+.pw main { display: flex; flex-direction: column; min-width: 0; }
+.pw-bar { display: flex; gap: 18px; align-items: center; font-size: 14px; color: #4b5563; padding: 10px 18px; border-bottom: 1px solid #e5e7eb; }
+.pw-bar em { margin-left: 12px; font-style: normal; color: #6b7280; font-family: var(--mono); font-size: 13px; }
+.pw-chat { flex: 1; padding: 16px 22px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.pw-user { align-self: flex-end; background: #f1f3f5; border-radius: 14px; padding: 10px 16px; font-size: 17px; max-width: 80%; }
+.pw-model { font-size: 13px; color: #8a8f98; font-family: var(--mono); }
+.pw-think { background: #f4f5f7; border: 1px solid #e5e7eb; border-radius: 8px; padding: 7px 12px; font-size: 15px; color: #4b5563; }
+.pw-tools { position: relative; display: flex; flex-direction: column; gap: 7px; border-radius: 10px; outline: 3px solid var(--accent); outline-offset: 5px; }
+.pw-tool { display: flex; gap: 12px; align-items: center; border: 1px solid #b9e2c6; background: #f4fbf6; border-radius: 8px; padding: 7px 12px; }
+.pw-tool b { font-family: var(--mono); color: #15803d; font-size: 15px; min-width: 46px; }
+.pw-tool code { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #374151; }
+.pw-tool i { font-style: normal; font-size: 13px; color: #8a8f98; font-family: var(--mono); }
+.pw-call { right: 6px; top: -60px; }
+.pw-answer { font-size: 17px; line-height: 1.6; margin-top: 8px; }
+.pw-answer code { background: #f1f3f5; padding: 1px 6px; border-radius: 5px; }
+.pw-input { margin: 0 22px 16px; border: 1px solid #d9dce1; border-radius: 12px; padding: 12px 16px; display: flex; justify-content: space-between; color: #9ca3af; font-size: 16px; }
+.pw-input b { color: #6b7280; font-weight: 500; }
+
+.pt { background: #f4f4f4; }
+.pt-nav { background: #fff; border-bottom: 1px solid #e3e3e3; display: flex; align-items: center; gap: 18px; padding: 12px 20px; font-size: 14px; color: #374151; font-weight: 600; }
+.pt-nav b { display: flex; align-items: center; gap: 8px; font-size: 16px; margin-right: 6px; }
+.pt-nav b i { font-style: normal; width: 26px; height: 26px; border: 1px solid #c9d6cd; background: #eef4f0; color: #24573c; border-radius: 6px; display: grid; place-items: center; }
+.pt-nav .on { background: #e7f0ea; color: #24573c; padding: 4px 10px; border-radius: 6px; }
+.pt-body { padding: 14px 22px; }
+.pt-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.pt-title b { font-size: 26px; }
+.pt-btn { background: #24573c; color: #fff; font-size: 15px; font-weight: 600; padding: 7px 14px; border-radius: 6px; }
+.pt-card { background: #fff; border: 1px solid #e3e3e3; border-radius: 10px; padding: 6px 16px 12px; position: relative; }
+.pt-row { display: grid; grid-template-columns: 1.3fr .9fr .7fr .8fr 1.2fr .6fr; align-items: center; padding: 9px 0; border-bottom: 1px solid #eee; font-size: 15px; }
+.pt-row small { display: block; font-size: 12px; color: #8a8f98; }
+.pt-head { font-size: 12px; color: #6b7280; font-weight: 700; padding: 8px 0; }
+.pt-row em { font-style: normal; font-size: 12px; padding: 2px 8px; border-radius: 999px; }
+.pt-ok { background: #e6f4ea; color: #1e6b3a; } .pt-adm { background: #e8eefc; color: #2a4a9c; }
+.pt-mini { justify-self: end; font-size: 12px; border: 1px solid #d5d5d5; border-radius: 6px; padding: 3px 8px; }
+.pt-row.open { border-bottom: 0; }
+.pt-acts { display: flex; flex-wrap: wrap; gap: 8px; background: #fafafa; border-radius: 8px; padding: 12px; }
+.pt-act { font-size: 13px; font-weight: 600; border: 1px solid #d5d5d5; background: #fff; border-radius: 6px; padding: 4px 10px; }
+.pt-act.hl { color: #b42318; border-color: #b42318; }
+.pt-call { position: static; margin-left: auto; font-size: 17px; padding: 4px 12px; }
+
+.gf { background: #f4f5f5; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.gf-top { display: flex; gap: 16px; align-items: center; font-size: 16px; } .gf-top span { font-size: 14px; border: 1px solid #d0d4d9; background: #fff; border-radius: 4px; padding: 2px 10px; }
+.gf-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.gf-stats div, .gf-panel { background: #fff; border: 1px solid #dfe1e5; border-radius: 4px; padding: 8px 12px; }
+.gf-stats small, .gf-panel small { display: block; font-size: 13px; font-weight: 600; color: #24292e; }
+.gf-stats b { font-size: 38px; font-weight: 600; color: #1f60c4; } .gf-stats b.g { color: #1a7f37; }
+.gf-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.gf-panel svg { flex: 1; width: 100%; min-height: 0; margin-top: 6px; }
+
+/* --- walls --- */
+.walls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; margin-top: 60px; }
+.wall { border-radius: 28px; padding: 46px 46px 50px; background: var(--panel); border: 1px solid var(--line); border-top: 8px solid var(--teal); box-shadow: var(--shadow); }
+.wall .n { font-family: var(--mono); color: var(--teal); font-size: 30px; font-weight: 700; }
+.wall h3 { font-size: 56px; margin: 18px 0 22px; }
+.wall p { font-size: 32px; color: var(--dim); line-height: 1.55; }
+.band { margin-top: 40px; display: flex; gap: 20px; flex-wrap: wrap; align-items: center; font-size: 30px; color: var(--dim); }
+.band .tag { font-size: 30px; padding: 12px 26px; }
+
+/* --- ops --- */
+.ops { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; height: 540px; }
+.ops figure { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+.ops figcaption { font-size: 30px; color: var(--dim); }
+.ops figcaption b { color: var(--text); }
+.ops .shot { flex: 1; }
+.ops-chips { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+.ops-chips span { font-size: 26px; padding: 10px 22px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+.ops-chips span b { color: var(--accent); font-weight: 600; }
+
+/* --- numbers --- */
+.nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 100px; }
+.proof { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 90px; }
+.proof .tag { font-size: 30px; padding: 14px 30px; }
+.proof .tag b { color: var(--text); font-weight: 600; }
+.nums div { border-left: 4px solid var(--accent); padding: 10px 0 10px 34px; }
+.nums b { display: block; font-size: 120px; font-weight: 800; line-height: 1; letter-spacing: -.03em; }
+.nums b small { font-size: 44px; font-weight: 700; margin-left: 8px; color: var(--dim); letter-spacing: 0; }
+.nums span { display: block; font-size: 32px; margin-top: 22px; }
+.nums em { display: block; font-style: normal; font-size: 26px; color: var(--faint); margin-top: 8px; }
+
+/* --- future --- */
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 50px; margin-top: 56px; }
+.list { display: flex; flex-direction: column; gap: 18px; }
+.list div { font-size: 34px; padding: 24px 32px; border-radius: 20px; background: var(--panel); border: 1px solid var(--line); }
+.list div small { display: block; font-size: 27px; color: var(--dim); margin-top: 6px; }
+.lbl { font-size: 30px; color: var(--accent); font-weight: 700; letter-spacing: .12em; margin-bottom: 22px; }
+.lbl.t { color: var(--teal); }
+
+/* --- chrome --- */
+#bar { position: fixed; left: 0; bottom: 0; height: 4px; background: var(--accent); transition: width .4s ease; z-index: 5; }
+#nav { position: fixed; right: 14px; bottom: 12px; display: flex; gap: 6px; align-items: center; z-index: 5; font: 13px var(--mono); color: var(--faint); }
+#nav button { all: unset; cursor: pointer; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--dim); background: var(--panel); border: 1px solid var(--line); }
+#nav button:hover { color: var(--text); border-color: var(--faint); }
+#hint { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); font-size: 13px; color: var(--faint); transition: opacity .6s; z-index: 5; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- 1 封面 -->
+<section class="slide cover">
+  <div class="kicker r" style="--i:0">人工智能赋能创意挑战赛</div>
+  <h1 class="r" style="--i:1">pi-<em>container</em></h1>
+  <div class="sub r" style="--i:2">给每个 AI 智能体，一台隔离的计算机</div>
+  <div class="desc r" style="--i:3">面向企业私有环境的容器化智能体运行平台</div>
+  <div class="meta r" style="--i:4"><span>作者<b>Q</b></span><span>版本<b>v1.0</b></span></div>
+  <div class="fleet r" style="--i:3" aria-hidden="true">
+    <i></i><i></i><i></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i><i></i><i class="on"></i><i></i><i class="on"></i><i></i><i></i><i></i>
+  </div>
+</section>
+
+<!-- 2 痛点 -->
+<section class="slide pain">
+  <div class="kicker r" style="--i:0">要解决的问题</div>
+  <h2 class="r" style="--i:1">企业想让 AI 真正干活<br>却有三个<em>“不敢”</em></h2>
+  <div class="row mt grow">
+    <div class="card r" style="--i:2"><span class="num">01</span><h3>不敢<span>给权限</span></h3><p>能动手的 AI 会写代码、装软件、跑程序，也可能删错文件、碰到公司内网系统。</p></div>
+    <div class="card r" style="--i:3"><span class="num">02</span><h3>不敢<span>给密钥</span></h3><p>模型的 API 密钥一旦放进 AI 的环境，就可能被读出来、被带走。</p></div>
+    <div class="card r" style="--i:4"><span class="num">03</span><h3><span>管不住</span></h3><p>谁在用？用了多少？出了事找谁？员工离职后怎么立刻收回？</p></div>
+  </div>
+</section>
+
+<!-- 3 会说 → 会做 -->
+<section class="slide">
+  <div class="kicker r" style="--i:0">从“会说”到“会做”</div>
+  <h2 class="r" style="--i:1">智能体能替人动手，但它需要<em>一台电脑</em></h2>
+  <div class="vs mt">
+    <div class="card r" style="--i:2"><h3>聊天式 AI</h3><p>告诉你该怎么做<br>剩下的，你自己动手</p></div>
+    <div class="arrow r" style="--i:3">→</div>
+    <div class="card hot r" style="--i:4"><h3>智能体</h3><p>直接替你做完</p>
+      <div class="chips"><span>写代码</span><span>装软件</span><span>处理文件</span><span>操作浏览器</span><span>做视频</span></div></div>
+  </div>
+  <div class="where">
+    <div class="x r" style="--i:5"><b>✕</b> 放在员工电脑上<small>权限太大，一不小心就出事</small></div>
+    <div class="x r" style="--i:6"><b>✕</b> 放在公共服务器上<small>大家混用，互相干扰、无法追责</small></div>
+    <div class="ok r" style="--i:7"><b>✓</b> pi-container<small>每人一台隔离的 AI 电脑</small></div>
+  </div>
+</section>
+
+<!-- 4 方案 -->
+<section class="slide">
+  <div class="kicker r" style="--i:0">我们的方案</div>
+  <h2 class="r" style="--i:1">每人一台 AI 电脑，<em>统一登录、统一管理</em></h2>
+  <div class="arch">
+    <div class="node r" style="--i:2"><b>员工</b><small>打开浏览器<br>就能用</small></div>
+    <div class="flow r" style="--i:3">→</div>
+    <div class="platform r" style="--i:4">
+      <div class="hd"><b>pi-container 平台</b><span>统一登录 · 权限 · 调度 · 审计 · 监控</span></div>
+      <div class="hosts">
+        <div class="host"><small>设备 A</small>
+          <div class="pc"><b>张三的 AI 电脑</b><span>工作台 + 智能体 + 工具箱</span></div>
+          <div class="pc"><b>李四的 AI 电脑</b><span>工作台 + 智能体 + 工具箱</span></div></div>
+        <div class="host"><small>设备 B</small>
+          <div class="pc"><b>王五的 AI 电脑</b><span>工作台 + 智能体 + 工具箱</span></div>
+          <div class="pc"><b>……</b><span>按需新建，几秒就绪</span></div></div>
+        <div class="gw"><b>模型网关</b><small>密钥托管 · 按人计量</small><div class="model">DeepSeek 等<br>开源大模型</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot r" style="--i:5"><b>站在开源的肩膀上：</b>智能体与工作台复用开源项目 pi-agent / pi-web，平台补齐企业落地所需的一切。</div>
+</section>
+
+<!-- 5 AI 方法 -->
+<section class="slide">
+  <div class="kicker r" style="--i:0">采用的 AI 方法</div>
+  <h2 class="r" style="--i:1">会思考、会动手、<em>会学习</em></h2>
+  <div class="method">
+    <div class="loop r" style="--i:2">
+      <svg viewBox="0 0 640 640" aria-hidden="true">
+        <circle cx="320" cy="320" r="210" fill="none" style="stroke: var(--line)" stroke-width="4"/>
+        <g class="spin"><circle cx="320" cy="320" r="210" fill="none" style="stroke: var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="120 1200"/></g>
+      </svg>
+      <div class="st" style="left:320px; top:110px"><b>思考</b><small>大模型规划下一步</small></div>
+      <div class="st" style="left:510px; top:440px"><b>动手</b><small>运行命令、改文件<br>开浏览器</small></div>
+      <div class="st" style="left:130px; top:440px"><b>观察</b><small>读取结果<br>判断对错</small></div>
+      <div class="core"><b>工具调用</b>智能体循环</div>
+    </div>
+    <div class="col">
+      <div class="card r" style="--i:3"><h3>技能自扩展</h3><p>给它一个网址，它自己读文档、装工具，学会新本事——左边正在发生的就是这件事。</p></div>
+      <div class="card r" style="--i:4"><h3>统一模型网关</h3><p>接入 DeepSeek 等开源大模型，可随时替换；密钥由平台托管，用量按人计量。</p></div>
+    </div>
+  </div>
+  <div class="foot r" style="--i:5"><b>我们不训练模型：</b>模型会不断进步，而让 AI 在企业里安全干活的平台，是长期价值。</div>
+</section>
+
+<!-- 6 看左边 -->
+<section class="slide look">
+  <div class="kicker r" style="--i:0">此刻，现场</div>
+  <div class="big r" style="--i:1">
+    <svg class="look-arrow" width="200" height="140" viewBox="0 0 200 140" aria-hidden="true"><path d="M190 70H30M80 16 26 70l54 54" fill="none" style="stroke: var(--accent)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    看左边
+  </div>
+  <p class="lead r" style="--i:2">我只给了它<span class="em">一个网址和一段话</span>，它正在：</p>
+  <div class="steps r" style="--i:3">
+    <span>读说明书</span><i>→</i><span>给自己装技能</span><i>→</i><span>读这份 slides</span><i>→</i><span>写分镜和文案</span><i>→</i><span>渲染 50 秒视频</span>
+  </div>
+  <p class="small mt r" style="--i:4">全程无人干预 · 运行在一台隔离的 AI 电脑里</p>
+</section>
+
+<!-- 7 工具箱 -->
+<section class="slide">
+  <div class="kicker r" style="--i:0">AI 电脑里有什么</div>
+  <h2 class="r" style="--i:1">一个<em>完整的 Linux 工具箱</em>，开箱即用</h2>
+  <div class="tools">
+    <div class="tool r" style="--i:2"><div class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg></div><b>编程</b><p>Python · Node.js · Rust</p></div>
+    <div class="tool r" style="--i:3"><div class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg></div><b>办公文档</b><p>Word / Excel / PPT · PDF</p></div>
+    <div class="tool r" style="--i:4"><div class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg></div><b>音视频</b><p>剪辑、转码、配图，生成视频</p></div>
+    <div class="tool r" style="--i:5"><div class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></div><b>浏览器</b><p>它能自己打开网页、截图</p></div>
+    <div class="tool r" style="--i:6"><div class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></div><b>持久保存</b><p>文件和对话，关机重启都不丢</p></div>
+    <div class="tool r" style="--i:7"><div class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div><b>资源限额</b><p>CPU · 内存 · 磁盘，互不拖累</p></div>
+  </div>
+  <div class="foot r" style="--i:8"><b>每个工具都经过实机检测：</b>设备上真能用才上报“可用”，不靠文档宣称。</div>
+</section>
+
+<!-- 8 工作台 -->
+<section class="slide">
+  <div class="kicker r" style="--i:0">智能体工作台</div>
+  <h2 class="r" style="--i:1">它在做什么，<em>看得见、接得住</em></h2>
+  <div class="bench">
+    <div class="shot r" style="--i:2">
+      <div class="mk pw" aria-hidden="true">
+        <aside>
+          <div class="pw-brand"><b>Pi Agent Web</b><span>+ 新建</span></div>
+          <div class="pw-cwd">/workspace</div>
+          <div class="pw-sess on"><b>制作 50 秒介绍视频</b><small>运行中 · 14 条消息</small></div>
+          <div class="pw-sess"><b>克隆 slides</b><small>3 分钟前 · 2 条消息</small></div>
+          <div class="pw-exp">文件</div>
+          <div class="pw-tree">
+            <div>▸ pi-container-slides</div>
+            <div>▾ video</div>
+            <div class="i">index.html</div>
+            <div class="i">hyperframes.json</div>
+            <div class="i hl">▶ pi-container-intro.mp4</div>
+          </div>
+          <div class="pw-foot"><span>模型</span><span>技能</span><span>终端</span></div>
+        </aside>
+        <main>
+          <div class="pw-bar"><span>导出</span><span>分支</span><span>系统</span><em>↑ 41k · ↓ 7k · 上下文 6%</em></div>
+          <div class="pw-chat">
+            <div class="pw-user">学会 HyperFrames，为 pi-container 做一段 50 秒的中文介绍视频</div>
+            <div class="pw-model">deepseek-v4-flash</div>
+            <div class="pw-think">思考</div>
+            <div class="pw-tools">
+              <div class="pw-tool"><b>bash</b><code>npx -y hyperframes@0.8.186 skills update</code><i>46s</i></div>
+              <div class="pw-tool"><b>read</b><code>~/.agents/skills/hyperframes/SKILL.md</code><i>1s</i></div>
+              <div class="pw-tool"><b>read</b><code>/workspace/pi-container-slides/CONTENT.md</code><i>1s</i></div>
+              <div class="pw-tool"><b>write</b><code>/workspace/video/index.html</code><i>2s</i></div>
+              <div class="pw-tool"><b>bash</b><code>npx hyperframes render --output /workspace/video/pi-container-intro.mp4</code><i>2m 38s</i></div>
+              <span class="pw-call">每一步动作实时可见</span>
+            </div>
+            <div class="pw-answer">视频已生成：<code>/workspace/video/pi-container-intro.mp4</code>，时长 50 秒，1920×1080。共 6 个分镜：开场、三个“不敢”、每人一台 AI 电脑、三道墙、实际效果、结尾。</div>
+          </div>
+          <div class="pw-input"><span>发消息…</span><b>发送</b></div>
+        </main>
+      </div>
+      <span class="badge">界面示意</span>
+    </div>
+    <div class="feat">
+      <div class="r" style="--i:3">实时看到思考与每一步动作</div>
+      <div class="r" style="--i:4">文件即点即看<small>网页 · 图片 · 音视频 · PDF · Word</small></div>
+      <div class="r" style="--i:5">网页终端<small>随时亲手接管这台电脑</small></div>
+      <div class="r" style="--i:6">Git 改动对比</div>
+      <div class="r" style="--i:7">对话随时续上<small>也能从任意一步分支重来</small></div>
+      <div class="r" style="--i:8">网页上配置模型与技能</div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 三道墙 -->
+<section class="slide">
+  <div class="kicker r" style="--i:0">为什么企业敢用</div>
+  <h2 class="r" style="--i:1">给每台 AI 电脑，砌好<em>三道墙</em></h2>
+  <div class="walls">
+    <div class="wall r" style="--i:2"><span class="n">01</span><h3>互相看不见</h3><p>每人一台独立的 AI 电脑，张三的 AI 看不到李四的文件，网址猜对了也进不去。</p></div>
+    <div class="wall r" style="--i:3"><span class="n">02</span><h3>碰不到内网</h3><p>默认可以上公网查资料，公司内网一律拦截，管理员按需放行。</p></div>
+    <div class="wall r" style="--i:4"><span class="n">03</span><h3>拿不到密钥</h3><p>模型密钥只存在平台网关里，AI 电脑里一个都没有，想偷也偷不到。</p></div>
+  </div>
+  <div class="band r" style="--i:5"><span>此外：</span><span class="tag">资源限额</span><span class="tag">不提权运行</span><span class="tag">停用账号，连接立即断开</span><span class="tag">关键操作留痕审计</span></div>
+</section>
+
+<!-- 10 管理与运维 -->
+<section class="slide">
+  <div class="kicker r" style="--i:0">企业管理与运维</div>
+  <h2 class="r" style="--i:1">管理员一眼看清，<em>一键处置</em></h2>
+  <div class="ops">
+    <figure class="r" style="--i:2"><figcaption><b>管理后台</b> · 用户、权限与模型用量</figcaption>
+      <div class="shot"><div class="mk pt" aria-hidden="true">
+        <div class="pt-nav"><b><i>π</i>Agent Workspace</b><span>Workspace</span><span class="on">用户</span><span>全部 Workspace</span><span>Worker</span><span>网络出口</span><span>审计</span></div>
+        <div class="pt-body">
+          <div class="pt-title"><b>用户</b><span class="pt-btn">新建本地用户</span></div>
+          <div class="pt-card">
+            <div class="pt-row pt-head"><span>用户</span><span>角色</span><span>状态</span><span>Workspace</span><span>本周期模型花费</span><span></span></div>
+            <div class="pt-row"><span><b>admin</b><small>本地账户</small></span><span><em class="pt-adm">管理员</em></span><span><em class="pt-ok">正常</em></span><span>0</span><span>—</span><span class="pt-mini">管理</span></div>
+            <div class="pt-row"><span><b>张三</b><small>企业单点登录</small></span><span>普通用户</span><span><em class="pt-ok">正常</em></span><span>2</span><span>$1.86 / $20</span><span class="pt-mini">管理</span></div>
+            <div class="pt-row open"><span><b>王五</b><small>企业单点登录</small></span><span>普通用户</span><span><em class="pt-ok">正常</em></span><span>1</span><span>$3.12 / $20</span><span class="pt-mini">收起</span></div>
+            <div class="pt-acts"><span class="pt-act hl">禁用</span><span class="pt-act">撤销会话</span><span class="pt-act">每周期预算</span><span class="pt-act">轮换模型凭据</span><span class="pt-call">离职一键停用，连接立即断开</span></div>
+          </div>
+        </div>
+      </div><span class="badge">界面示意</span></div></figure>
+    <figure class="r" style="--i:3"><figcaption><b>监控面板</b> · 设备、资源与告警</figcaption>
+      <div class="shot"><div class="mk gf" aria-hidden="true">
+        <div class="gf-top"><b>Agent Runtime / 平台总览</b><span>最近 6 小时 ▾</span></div>
+        <div class="gf-stats">
+          <div><small>在线 Worker</small><b class="g">2</b></div>
+          <div><small>运行中 Workspace</small><b>5</b></div>
+          <div><small>触发中告警</small><b class="g">0</b></div>
+          <div><small>Gateway 错误率</small><b class="g">0.0%</b></div>
+        </div>
+        <div class="gf-panel"><small>Workspace CPU（核）</small>
+          <svg viewBox="0 0 700 150" preserveAspectRatio="none">
+            <g stroke="#e4e6ea" stroke-width="1"><line x1="0" y1="37" x2="700" y2="37"/><line x1="0" y1="75" x2="700" y2="75"/><line x1="0" y1="112" x2="700" y2="112"/></g>
+            <polyline fill="none" stroke="#3274d9" stroke-width="3" points="0,128 50,126 100,120 150,124 200,96 250,70 300,78 350,64 400,90 450,118 500,122 550,84 600,48 650,40 700,56"/>
+            <polyline fill="none" stroke="#ff9830" stroke-width="3" points="0,136 50,134 100,136 150,118 200,122 250,128 300,104 350,110 400,132 450,130 500,96 550,104 600,124 650,128 700,120"/>
+            <polyline fill="none" stroke="#56a64b" stroke-width="3" points="0,140 50,140 100,138 150,139 200,136 250,140 300,138 350,126 400,118 450,124 500,136 550,138 600,134 650,139 700,140"/>
+          </svg></div>
+        <div class="gf-panel"><small>模型请求（次 / 分钟）</small>
+          <svg viewBox="0 0 700 110" preserveAspectRatio="none"><g fill="#8f3bb8">
+            <rect x="8" y="88" width="30" height="22"/><rect x="56" y="80" width="30" height="30"/><rect x="104" y="60" width="30" height="50"/><rect x="152" y="70" width="30" height="40"/><rect x="200" y="38" width="30" height="72"/><rect x="248" y="50" width="30" height="60"/><rect x="296" y="76" width="30" height="34"/><rect x="344" y="84" width="30" height="26"/><rect x="392" y="56" width="30" height="54"/><rect x="440" y="30" width="30" height="80"/><rect x="488" y="22" width="30" height="88"/><rect x="536" y="44" width="30" height="66"/><rect x="584" y="64" width="30" height="46"/><rect x="632" y="72" width="30" height="38"/></g></svg></div>
+      </div><span class="badge">界面示意</span></div></figure>
+  </div>
+  <div class="ops-chips r" style="--i:4">
+    <span><b>按人</b>计量模型用量与预算</span><span><b>一键</b>停用账号</span>
+    <span>企业<b>单点登录</b></span><span><b>19</b> 条告警规则</span><span>空闲<b>自动回收</b></span><span>版本升级<b>可回滚</b></span>
+  </div>
+</section>
+
+<!-- 11 实际效果 -->
+<section class="slide">
+  <div class="kicker r" style="--i:0">取得的效果</div>
+  <h2 class="r" style="--i:1">不是概念演示，是<em>可以交付的 v1.0</em></h2>
+  <div class="nums">
+    <div class="r" style="--i:2"><b>6<small>周</small></b><span>从第一行代码到 v1.0</span><em>2026.09 – 2026.10</em></div>
+    <div class="r" style="--i:3"><b>20<small>个</small></b><span>迭代阶段</span><em>逐个开发、逐个验收</em></div>
+    <div class="r" style="--i:4"><b>689<small>项</small></b><span>自动化测试全部通过</span><em>含安全规则与真实设备测试</em></div>
+    <div class="r" style="--i:5"><b>2<small>台</small></b><span>低功耗 ARM 设备</span><em>跨主机真实部署</em></div>
+  </div>
+  <div class="proof r" style="--i:6"><span class="tag"><b>19</b> 条告警规则</span><span class="tag"><b>15</b> 篇运维手册</span><span class="tag">发布包 <b>0</b> 个高危漏洞（Trivy 扫描）</span><span class="tag">支持<b>原位升级</b>，数据不丢</span></div>
+  <div class="foot r" style="--i:7"><b>今天左侧的现场演示，</b>就运行在这样的低功耗设备上。</div>
+</section>
+
+<!-- 12 应用与未来 -->
+<section class="slide">
+  <div class="kicker r" style="--i:0">未来如何应用</div>
+  <h2 class="r" style="--i:1">让每位员工，都有一个<em>能干活的 AI 同事</em></h2>
+  <div class="two">
+    <div class="r" style="--i:2"><div class="lbl">应用场景</div>
+      <div class="list"><div>报告与文档生成</div><div>数据整理与分析</div><div>宣传物料：图片、视频</div><div>研发辅助与网页测试</div></div></div>
+    <div class="r" style="--i:3"><div class="lbl t">推广路径</div>
+      <div class="list">
+        <div>私有化部署<small>部署在企业内网，数据不出门</small></div>
+        <div>低功耗设备即可承载<small>ARM 边缘设备，成本低、易铺开</small></div>
+        <div>沉淀企业技能库<small>今天学会的本事，明天全员的 AI 都会</small></div>
+      </div></div>
+  </div>
+</section>
+
+<!-- 13 回到左侧 -->
+<section class="slide look">
+  <div class="kicker r" style="--i:0">收获成果</div>
+  <div class="big r" style="--i:1">
+    <svg class="look-arrow" width="200" height="140" viewBox="0 0 200 140" aria-hidden="true"><path d="M190 70H30M80 16 26 70l54 54" fill="none" style="stroke: var(--accent)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    它做完了吗？
+  </div>
+  <p class="lead r" style="--i:2">回到左边，看它刚做好的视频</p>
+  <p class="small mt r" style="--i:3">从学习工具到最终成片，全部由智能体在自己的 AI 电脑里独立完成</p>
+</section>
+
+</div>
+
+<div id="bar"></div>
+<div id="hint">点击页面后，用 ← → 或空格翻页，T 切换深浅色</div>
+<div id="nav"><button id="theme" aria-label="切换深色/浅色" title="切换深色/浅色（T）">◐</button><button id="prev" aria-label="上一页">‹</button><span id="count"></span><button id="next" aria-label="下一页">›</button></div>
+
+<script>
+(() => {
+  const stage = document.getElementById("stage");
+  const slides = [...document.querySelectorAll(".slide")];
+  const bar = document.getElementById("bar");
+  const count = document.getElementById("count");
+  let cur = 0;
+
+  function fit() {
+    const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+    stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
+  }
+
+  function go(n) {
+    n = Math.max(0, Math.min(slides.length - 1, n));
+    slides[cur].classList.remove("active");
+    cur = n;
+    slides[cur].classList.add("active");
+    bar.style.width = `${((cur + 1) / slides.length) * 100}%`;
+    count.textContent = `${cur + 1} / ${slides.length}`;
+  }
+
+  addEventListener("keydown", (e) => {
+    const k = e.key;
+    if (["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"].includes(k)) { e.preventDefault(); go(cur + 1); }
+    else if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(k)) { e.preventDefault(); go(cur - 1); }
+    else if (k === "Home") go(0);
+    else if (k === "End") go(slides.length - 1);
+    else if (k === "t" || k === "T") toggleTheme();
+  });
+  // srcdoc sandbox has no storage: theme persistence is best-effort only
+  function setTheme(t) {
+    document.documentElement.dataset.theme = t;
+    try { localStorage.setItem("deck-theme", t); } catch {}
+  }
+  function toggleTheme() { setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"); }
+  try { const saved = localStorage.getItem("deck-theme"); if (saved) document.documentElement.dataset.theme = saved; } catch {}
+  document.getElementById("theme").onclick = toggleTheme;
+  document.getElementById("prev").onclick = () => go(cur - 1);
+  document.getElementById("next").onclick = () => go(cur + 1);
+  let tx = null;
+  addEventListener("touchstart", (e) => { tx = e.touches[0].clientX; }, { passive: true });
+  addEventListener("touchend", (e) => {
+    if (tx === null) return;
+    const dx = e.changedTouches[0].clientX - tx;
+    if (Math.abs(dx) > 50) go(cur + (dx < 0 ? 1 : -1));
+    tx = null;
+  });
+  const hint = document.getElementById("hint");
+  const hide = () => { hint.style.opacity = 0; };
+  addEventListener("keydown", hide, { once: true });
+  addEventListener("pointerdown", hide, { once: true });
+
+  addEventListener("resize", fit);
+  fit();
+  go(0);
+})();
+</script>
+</body>
+</html>
